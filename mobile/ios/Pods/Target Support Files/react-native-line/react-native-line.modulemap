@@ -1,0 +1,6 @@
+module react_native_line {
+  umbrella header "react-native-line-umbrella.h"
+
+  export *
+  module * { export * }
+}
