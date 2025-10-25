@@ -7,7 +7,7 @@ interface UseLineAuthReturn {
   user: User | null;
   linkToken: string | null;
   loading: boolean;
-  error: string | null;
+  error: Error | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -16,7 +16,7 @@ export const useLineAuth = (): UseLineAuthReturn => {
   const [user, setUser] = useState<User | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   const login = async () => {
     try {
@@ -55,9 +55,9 @@ export const useLineAuth = (): UseLineAuthReturn => {
       setLinkToken(data.linkToken);
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'ログインに失敗しました';
-      console.error('Login Error:', errorMessage);
-      setError(errorMessage);
+      const errorObj = err instanceof Error ? err : new Error('ログインに失敗しました');
+      console.error('Login Error:', errorObj.message);
+      setError(errorObj);
       throw err;
     } finally {
       setLoading(false);
@@ -76,9 +76,9 @@ export const useLineAuth = (): UseLineAuthReturn => {
 
       console.log('=== Logout Success ===');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'ログアウトに失敗しました';
-      console.error('Logout Error:', errorMessage);
-      setError(errorMessage);
+      const errorObj = err instanceof Error ? err : new Error('ログアウトに失敗しました');
+      console.error('Logout Error:', errorObj.message);
+      setError(errorObj);
       throw err;
     } finally {
       setLoading(false);

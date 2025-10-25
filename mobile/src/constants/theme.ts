@@ -6,6 +6,7 @@ export const Colors = {
   // 背景色
   background: '#FFFFFF',
   backgroundSecondary: '#F7F7F7',
+  surface: '#F0F0F0',
   
   // テキスト色
   text: '#000000',
