@@ -25,10 +25,13 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+            <key>CFBundleURLName</key>
+            <string>com.tamuy.clipline</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+                <string>clipline</string>
 				<string>line3rdp.$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>

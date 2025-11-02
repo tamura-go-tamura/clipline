@@ -33,12 +33,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     return true
   }
   
-  // URL Schemeハンドリング（LINE SDK用）
+  // URL Schemeハンドリング（LINE SDK + Share Extension用）
   func application(
     _ app: UIApplication,
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey : Any] = [:]
   ) -> Bool {
+    // Share Extensionからの起動チェック
+    if url.scheme == "clipline" && url.host == "share" {
+      // Share Extensionからの起動
+      NotificationCenter.default.post(name: NSNotification.Name("ShareExtensionOpened"), object: nil)
+      return true
+    }
+    
+    // LINE SDKのURL処理
     return LoginManager.shared.application(app, open: url)
   }
 }
