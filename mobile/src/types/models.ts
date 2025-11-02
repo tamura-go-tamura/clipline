@@ -73,15 +73,16 @@ export interface LegacyShareData {
   timestamp: number;
 }
 
-// Memo型定義
+// 新Memo型定義（LINE風チャット用）
 export interface Memo {
-  id: string;
-  userId: string;
-  source: 'browser' | 'app' | 'extension';
-  url?: string;
-  title?: string;
-  quote?: string;
-  note?: string;
-  media?: string;
-  createdAt: string;
+  id: string;                     // uuid
+  type: ShareContentType;         // コンテンツタイプ
+  url?: string;                   // URL
+  text?: string;                  // テキスト
+  metadata?: ShareMetadata;       // メタデータ
+  userComment?: string;           // ユーザーコメント
+  createdAt: string;              // ISO8601形式
+  updatedAt: string;              // ISO8601形式
+  isSentToLine?: boolean;         // LINE送信済みフラグ
+  tags?: string[];                // タグ（将来的に使用）
 }

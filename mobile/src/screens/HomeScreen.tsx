@@ -9,10 +9,13 @@ import {
   StatusBar,
   ActivityIndicator,
   ScrollView,
+  Modal,
+  TouchableOpacity,
 } from 'react-native';
 import {useAuth} from '@/contexts/AuthContext';
 import {useShareExtension} from '@/hooks/useShareExtension';
 import {ShareDataCard} from '@/components/share/ShareDataCard';
+import {MemoListScreen} from '@/screens/MemoListScreen';
 import {Colors, Spacing, FontSize, BorderRadius} from '@/constants/theme';
 import {Config} from '@/constants/config';
 
@@ -23,6 +26,8 @@ export const HomeScreen: React.FC = () => {
     loading: shareLoading, // eslint-disable-line @typescript-eslint/no-unused-vars
     clearSharedData,
   } = useShareExtension();
+
+  const [isMemoListVisible, setIsMemoListVisible] = React.useState(false);
 
   const handleLogin = async () => {
     try {
@@ -136,7 +141,12 @@ export const HomeScreen: React.FC = () => {
           ) : (
             <View style={styles.buttonContainer}>
               <Button
-                title="📨 テストメッセージ送信"
+                title="� メモ一覧を見る"
+                onPress={() => setIsMemoListVisible(true)}
+                color={Colors.primary}
+              />
+              <Button
+                title="�📨 テストメッセージ送信"
                 onPress={handleSendTestMessage}
                 color={Colors.primary}
               />
@@ -149,6 +159,24 @@ export const HomeScreen: React.FC = () => {
           )}
         </View>
       </ScrollView>
+
+      {/* メモ一覧モーダル */}
+      <Modal
+        visible={isMemoListVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsMemoListVisible(false)}
+      >
+        <View style={styles.modalHeader}>
+          <TouchableOpacity 
+            onPress={() => setIsMemoListVisible(false)}
+            style={styles.closeButton}
+          >
+            <Text style={styles.closeButtonText}>✕ 閉じる</Text>
+          </TouchableOpacity>
+        </View>
+        <MemoListScreen />
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -228,5 +256,21 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '100%',
     gap: Spacing.sm,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  closeButton: {
+    padding: Spacing.sm,
+  },
+  closeButtonText: {
+    fontSize: FontSize.md,
+    color: Colors.primary,
+    fontWeight: '600',
   },
 });

@@ -10,10 +10,26 @@ import Social
 import MobileCoreServices
 import UniformTypeIdentifiers
 
-class ShareViewController: UIViewController {
+class ShareViewController: UIViewController, UITextViewDelegate {
   
     let appGroupId = "group.com.tamuy.clipline"
     let sharedDataKey = "ShareExtensionData"
+    
+    // プレビュー用のUI要素
+    private var thumbnailImageView: UIImageView!
+    private var titleLabel: UILabel!
+    private var descriptionLabel: UILabel!
+    private var urlLabel: UILabel!
+    private var loadingIndicator: UIActivityIndicatorView!
+    private var commentTextField: UITextView!  // コメント入力フィールド
+    
+    // 共有データを一時保存
+    private var sharedURL: URL?
+    private var sharedText: String?
+    private var pageTitle: String?
+    private var pageDescription: String?
+    private var thumbnailURL: String?
+    private var userComment: String?  // ユーザーコメント
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -32,43 +48,81 @@ class ShareViewController: UIViewController {
     }
     
     private func setupUI() {
-        // プレビュー用のラベル
+        // メインコンテナ
         let containerView = UIView()
         containerView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.backgroundColor = .systemGray6
-        containerView.layer.cornerRadius = 12
+        containerView.backgroundColor = .systemBackground
+        containerView.layer.cornerRadius = 16
+        containerView.layer.shadowColor = UIColor.black.cgColor
+        containerView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        containerView.layer.shadowOpacity = 0.1
+        containerView.layer.shadowRadius = 8
         view.addSubview(containerView)
         
-        let iconLabel = UILabel()
-        iconLabel.translatesAutoresizingMaskIntoConstraints = false
-        iconLabel.text = "📎"
-        iconLabel.font = .systemFont(ofSize: 40)
-        iconLabel.textAlignment = .center
-        containerView.addSubview(iconLabel)
+        // サムネイル画像
+        thumbnailImageView = UIImageView()
+        thumbnailImageView.translatesAutoresizingMaskIntoConstraints = false
+        thumbnailImageView.contentMode = .scaleAspectFill
+        thumbnailImageView.clipsToBounds = true
+        thumbnailImageView.layer.cornerRadius = 12
+        thumbnailImageView.backgroundColor = .systemGray5
+        thumbnailImageView.isHidden = true
+        containerView.addSubview(thumbnailImageView)
         
-        let titleLabel = UILabel()
+        // ローディングインジケーター
+        loadingIndicator = UIActivityIndicatorView(style: .medium)
+        loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
+        loadingIndicator.hidesWhenStopped = true
+        containerView.addSubview(loadingIndicator)
+        
+        // タイトルラベル
+        titleLabel = UILabel()
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = "共有内容"
-        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textAlignment = .center
+        titleLabel.font = .systemFont(ofSize: 18, weight: .bold)
+        titleLabel.textColor = .label
+        titleLabel.numberOfLines = 2
+        titleLabel.text = "読み込み中..."
         containerView.addSubview(titleLabel)
         
-        let contentLabel = UILabel()
-        contentLabel.tag = 100 // 後で参照するためのタグ
-        contentLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentLabel.text = "読み込み中..."
-        contentLabel.font = .systemFont(ofSize: 15)
-        contentLabel.textColor = .secondaryLabel
-        contentLabel.numberOfLines = 3
-        contentLabel.textAlignment = .center
-        containerView.addSubview(contentLabel)
+        // 説明文ラベル
+        descriptionLabel = UILabel()
+        descriptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        descriptionLabel.font = .systemFont(ofSize: 14)
+        descriptionLabel.textColor = .secondaryLabel
+        descriptionLabel.numberOfLines = 3
+        descriptionLabel.isHidden = true
+        containerView.addSubview(descriptionLabel)
+        
+        // URLラベル
+        urlLabel = UILabel()
+        urlLabel.translatesAutoresizingMaskIntoConstraints = false
+        urlLabel.font = .systemFont(ofSize: 12)
+        urlLabel.textColor = .tertiaryLabel
+        urlLabel.numberOfLines = 1
+        urlLabel.lineBreakMode = .byTruncatingMiddle
+        urlLabel.isHidden = true
+        containerView.addSubview(urlLabel)
+        
+        // コメント入力フィールド
+        commentTextField = UITextView()
+        commentTextField.translatesAutoresizingMaskIntoConstraints = false
+        commentTextField.font = .systemFont(ofSize: 15)
+        commentTextField.textColor = .label
+        commentTextField.backgroundColor = .systemGray6
+        commentTextField.layer.cornerRadius = 8
+        commentTextField.textContainerInset = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        commentTextField.isScrollEnabled = false
+        commentTextField.delegate = self
+        commentTextField.text = "メモを追加..."
+        commentTextField.textColor = .placeholderText
+        view.addSubview(commentTextField)
         
         // 送信ボタン
         let sendButton = UIButton(type: .system)
         sendButton.translatesAutoresizingMaskIntoConstraints = false
-        sendButton.setTitle("ClipLineに送信", for: .normal)
+        sendButton.setTitle("保存", for: .normal)
         sendButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        sendButton.backgroundColor = UIColor(red: 0.024, green: 0.78, blue: 0.33, alpha: 1.0) // LINE Green
+        sendButton.backgroundColor = UIColor(red: 0.024, green: 0.78, blue: 0.33, alpha: 1.0)
         sendButton.setTitleColor(.white, for: .normal)
         sendButton.layer.cornerRadius = 12
         sendButton.addTarget(self, action: #selector(sendButtonTapped), for: .touchUpInside)
@@ -76,23 +130,37 @@ class ShareViewController: UIViewController {
         
         // レイアウト設定
         NSLayoutConstraint.activate([
-            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -60),
+            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -40),
             containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             
-            iconLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
-            iconLabel.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            thumbnailImageView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 16),
+            thumbnailImageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            thumbnailImageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            thumbnailImageView.heightAnchor.constraint(equalToConstant: 180),
             
-            titleLabel.topAnchor.constraint(equalTo: iconLabel.bottomAnchor, constant: 12),
+            loadingIndicator.centerXAnchor.constraint(equalTo: thumbnailImageView.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: thumbnailImageView.centerYAnchor),
+            
+            titleLabel.topAnchor.constraint(equalTo: thumbnailImageView.bottomAnchor, constant: 16),
             titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
             
-            contentLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            contentLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            contentLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
-            contentLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20),
+            descriptionLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            descriptionLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            descriptionLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
             
-            sendButton.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: 24),
+            urlLabel.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 12),
+            urlLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            urlLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            urlLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -16),
+            
+            commentTextField.topAnchor.constraint(equalTo: containerView.bottomAnchor, constant: 16),
+            commentTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            commentTextField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            commentTextField.heightAnchor.constraint(greaterThanOrEqualToConstant: 60),
+            
+            sendButton.topAnchor.constraint(equalTo: commentTextField.bottomAnchor, constant: 16),
             sendButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             sendButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             sendButton.heightAnchor.constraint(equalToConstant: 50),
@@ -121,10 +189,11 @@ class ShareViewController: UIViewController {
     
     private func loadSharedContent() {
         print("📥 Loading shared content for preview")
+        loadingIndicator.startAnimating()
         
         guard let inputItems = extensionContext?.inputItems as? [NSExtensionItem] else {
             print("⚠️ No input items")
-            updatePreview(text: "共有できる内容が見つかりませんでした")
+            updatePreview(title: "エラー", description: "共有できる内容が見つかりませんでした")
             return
         }
         
@@ -135,13 +204,59 @@ class ShareViewController: UIViewController {
         }
         
         print("⚠️ No attachments found")
-        updatePreview(text: "共有できる内容が見つかりませんでした")
+        updatePreview(title: "エラー", description: "共有できる内容が見つかりませんでした")
     }
     
-    private func updatePreview(text: String) {
-        if let label = view.viewWithTag(100) as? UILabel {
-            label.text = text
+    private func updatePreview(title: String, description: String? = nil, url: String? = nil, thumbnailURL: String? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.titleLabel.text = title
+            
+            if let description = description {
+                self.descriptionLabel.text = description
+                self.descriptionLabel.isHidden = false
+            } else {
+                self.descriptionLabel.isHidden = true
+            }
+            
+            if let url = url {
+                self.urlLabel.text = "🔗 \(url)"
+                self.urlLabel.isHidden = false
+            } else {
+                self.urlLabel.isHidden = true
+            }
+            
+            // サムネイル画像の読み込み
+            if let thumbnailURLString = thumbnailURL,
+               let imageURL = URL(string: thumbnailURLString) {
+                self.loadThumbnailImage(from: imageURL)
+            } else {
+                self.loadingIndicator.stopAnimating()
+                self.thumbnailImageView.isHidden = true
+            }
         }
+    }
+    
+    private func loadThumbnailImage(from url: URL) {
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self,
+                  let data = data,
+                  error == nil,
+                  let image = UIImage(data: data) else {
+                DispatchQueue.main.async {
+                    self?.loadingIndicator.stopAnimating()
+                    self?.thumbnailImageView.isHidden = true
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.loadingIndicator.stopAnimating()
+                self.thumbnailImageView.image = image
+                self.thumbnailImageView.isHidden = false
+            }
+        }.resume()
     }
     
     private func previewAttachments(_ attachments: [NSItemProvider]) {
@@ -150,9 +265,8 @@ class ShareViewController: UIViewController {
             if attachment.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
                 attachment.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] (item, error) in
                     if let url = item as? URL {
-                        DispatchQueue.main.async {
-                            self?.updatePreview(text: url.absoluteString)
-                        }
+                        self?.sharedURL = url
+                        self?.fetchMetadata(for: url)
                     }
                 }
                 return
@@ -162,14 +276,106 @@ class ShareViewController: UIViewController {
             if attachment.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                 attachment.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] (item, error) in
                     if let text = item as? String {
+                        self?.sharedText = text
                         DispatchQueue.main.async {
-                            self?.updatePreview(text: text)
+                            self?.updatePreview(
+                                title: "テキスト",
+                                description: text
+                            )
                         }
                     }
                 }
                 return
             }
         }
+    }
+    
+    private func fetchMetadata(for url: URL) {
+        print("🔍 Fetching metadata for: \(url.absoluteString)")
+        
+        // URLSessionでHTMLを取得してOpen Graphメタデータを解析
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self,
+                  let data = data,
+                  let html = String(data: data, encoding: .utf8) else {
+                // メタデータ取得失敗時はURLのみ表示
+                DispatchQueue.main.async {
+                    self?.updatePreview(
+                        title: url.host ?? "Webページ",
+                        description: nil,
+                        url: url.absoluteString
+                    )
+                }
+                return
+            }
+            
+            // メタデータを抽出
+            let title = self.extractMetaTag(from: html, property: "og:title") ??
+                       self.extractTitle(from: html) ??
+                       url.host ?? "Webページ"
+            
+            let description = self.extractMetaTag(from: html, property: "og:description") ??
+                            self.extractMetaTag(from: html, name: "description")
+            
+            let imageURL = self.extractMetaTag(from: html, property: "og:image")
+            
+            // 保存用にメタデータを保持
+            self.pageTitle = title
+            self.pageDescription = description
+            self.thumbnailURL = imageURL
+            
+            // プレビュー更新
+            self.updatePreview(
+                title: title,
+                description: description,
+                url: url.absoluteString,
+                thumbnailURL: imageURL
+            )
+            
+            print("✅ Metadata extracted - Title: \(title)")
+            if let desc = description {
+                print("   Description: \(desc)")
+            }
+            if let img = imageURL {
+                print("   Image: \(img)")
+            }
+        }.resume()
+    }
+    
+    // Open Graphタグを抽出
+    private func extractMetaTag(from html: String, property: String) -> String? {
+        let pattern = "<meta[^>]*property=[\"']\(property)[\"'][^>]*content=[\"']([^\"']*)[\"'][^>]*>"
+        return extractPattern(pattern, from: html)
+    }
+    
+    // name属性のメタタグを抽出
+    private func extractMetaTag(from html: String, name: String) -> String? {
+        let pattern = "<meta[^>]*name=[\"']\(name)[\"'][^>]*content=[\"']([^\"']*)[\"'][^>]*>"
+        return extractPattern(pattern, from: html)
+    }
+    
+    // titleタグを抽出
+    private func extractTitle(from html: String) -> String? {
+        let pattern = "<title>([^<]*)</title>"
+        return extractPattern(pattern, from: html)
+    }
+    
+    // 正規表現でパターンマッチング
+    private func extractPattern(_ pattern: String, from text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+            return nil
+        }
+        
+        let nsString = text as NSString
+        let results = regex.matches(in: text, range: NSRange(location: 0, length: nsString.length))
+        
+        if let match = results.first, match.numberOfRanges > 1 {
+            let range = match.range(at: 1)
+            return nsString.substring(with: range)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        
+        return nil
     }
     
     private func handleSharedContent() {
@@ -244,16 +450,33 @@ class ShareViewController: UIViewController {
       private func saveSharedData(type: String, value: String, metadata: [String: String] = [:]) {
           let sharedDefaults = UserDefaults(suiteName: appGroupId)
           
+          // メタデータをマージ（fetchMetadata で取得したデータを優先）
+          var mergedMetadata = metadata
+          if let pageTitle = self.pageTitle {
+              mergedMetadata["title"] = pageTitle
+          }
+          if let pageDescription = self.pageDescription {
+              mergedMetadata["description"] = pageDescription
+          }
+          if let thumbnailURL = self.thumbnailURL {
+              mergedMetadata["thumbnailUrl"] = thumbnailURL
+          }
+          
           var data: [String: Any] = [
               "type": type,
               "value": value,
               "timestamp": ISO8601DateFormatter().string(from: Date())
           ]
           
+          // ユーザーコメントがあれば追加
+          if let comment = self.userComment, !comment.isEmpty {
+              data["userComment"] = comment
+          }
+          
           // メタデータがあれば追加
-          if !metadata.isEmpty {
+          if !mergedMetadata.isEmpty {
               // メタデータをJSON文字列に変換
-              if let metadataJson = try? JSONSerialization.data(withJSONObject: metadata),
+              if let metadataJson = try? JSONSerialization.data(withJSONObject: mergedMetadata),
                  let metadataString = String(data: metadataJson, encoding: .utf8) {
                   data["metadata"] = metadataString
               }
@@ -264,8 +487,11 @@ class ShareViewController: UIViewController {
               sharedDefaults?.set(jsonString, forKey: sharedDataKey)
               sharedDefaults?.synchronize()
               print("✅ Saved shared data: \(type) - \(value)")
-              if !metadata.isEmpty {
-                  print("   Metadata: \(metadata)")
+              if let comment = self.userComment {
+                  print("   User Comment: \(comment)")
+              }
+              if !mergedMetadata.isEmpty {
+                  print("   Metadata: \(mergedMetadata)")
               }
           }
       }
@@ -289,7 +515,35 @@ class ShareViewController: UIViewController {
           }
           
           // プレビューテキストを更新
-          updatePreview(text: "ClipLineアプリを開いて確認してください")
+          DispatchQueue.main.async { [weak self] in
+              self?.titleLabel.text = "✓ ClipLineに送信しました"
+              self?.descriptionLabel.text = "アプリを開いて確認してください"
+              self?.descriptionLabel.isHidden = false
+          }
+      }
+      
+      // MARK: - UITextViewDelegate
+      
+      func textViewDidBeginEditing(_ textView: UITextView) {
+          if textView.textColor == .placeholderText {
+              textView.text = ""
+              textView.textColor = .label
+          }
+      }
+      
+      func textViewDidEndEditing(_ textView: UITextView) {
+          if textView.text.isEmpty {
+              textView.text = "メモを追加..."
+              textView.textColor = .placeholderText
+          } else {
+              userComment = textView.text
+          }
+      }
+      
+      func textViewDidChange(_ textView: UITextView) {
+          if textView.textColor != .placeholderText {
+              userComment = textView.text
+          }
       }
 
 }
