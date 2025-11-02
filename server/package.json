@@ -2,19 +2,39 @@
   "name": "clipline-server",
   "version": "1.0.0",
   "description": "ClipLine API Server",
-  "main": "index.js",
+  "main": "src/handler.js",
   "type": "module",
   "scripts": {
-    "dev": "node --watch index.js",
-    "start": "node index.js"
+    "dynamodb:start": "docker compose up -d dynamodb-local",
+    "dynamodb:stop": "docker compose down",
+    "dynamodb:create-tables": "node scripts/create-tables.js",
+    "dev": "serverless offline start",
+    "start": "node index.js",
+    "deploy": "serverless deploy",
+    "deploy:dev": "serverless deploy --stage dev",
+    "deploy:prod": "serverless deploy --stage prod",
+    "logs": "serverless logs -f api -t",
+    "remove": "serverless remove"
   },
-  "keywords": ["line", "oauth", "messaging-api"],
+  "keywords": [
+    "line",
+    "oauth",
+    "messaging-api"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
+    "@aws-sdk/client-dynamodb": "^3.922.0",
+    "@aws-sdk/lib-dynamodb": "^3.922.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "jsonwebtoken": "^9.0.2"
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "serverless-http": "^4.0.0"
+  },
+  "devDependencies": {
+    "serverless": "^4.22.0",
+    "serverless-dynamodb": "^0.2.56",
+    "serverless-offline": "^14.4.0"
   }
 }

@@ -1,0 +1,122 @@
+service: clipline-api
+
+frameworkVersion: '4'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-northeast-1  # 東京リージョン
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 30
+  
+  # 環境変数
+  environment:
+    LINE_LOGIN_CHANNEL_ID: ${env:LINE_LOGIN_CHANNEL_ID}
+    LINE_LOGIN_CHANNEL_SECRET: ${env:LINE_LOGIN_CHANNEL_SECRET}
+    LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: ${env:LINE_MESSAGING_CHANNEL_ACCESS_TOKEN}
+    LINE_CHANNEL_SECRET: ${env:LINE_CHANNEL_SECRET}
+    DYNAMODB_TABLE_MEMOS: ${self:custom.tableMemos}
+    DYNAMODB_TABLE_USERS: ${self:custom.tableUsers}
+    JWT_SECRET: ${env:JWT_SECRET}
+  
+  # IAM権限
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - !GetAtt MemosTable.Arn
+            - !GetAtt UsersTable.Arn
+            - !Sub "${MemosTable.Arn}/index/*"
+            - !Sub "${UsersTable.Arn}/index/*"
+
+# カスタム変数
+custom:
+  tableMemos: ${self:service}-memos-${self:provider.stage}
+  tableUsers: ${self:service}-users-${self:provider.stage}
+  
+  # serverless-offline設定（ローカル開発用）
+  serverless-offline:
+    httpPort: 3000
+    noPrependStageInUrl: true
+
+# Lambda関数定義
+functions:
+  api:
+    handler: src/app.handler
+    events:
+      # API Gateway経由のすべてのHTTPリクエスト
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+# DynamoDBテーブル定義
+resources:
+  Resources:
+    # メモテーブル
+    MemosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableMemos}
+        BillingMode: PAY_PER_REQUEST  # オンデマンド課金
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH   # パーティションキー
+          - AttributeName: SK
+            KeyType: RANGE  # ソートキー
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        Tags:
+          - Key: Environment
+            Value: ${self:provider.stage}
+          - Key: Service
+            Value: ${self:service}
+    
+    # ユーザーテーブル
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableUsers}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: lineUserId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: LineUserIdIndex
+            KeySchema:
+              - AttributeName: lineUserId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        Tags:
+          - Key: Environment
+            Value: ${self:provider.stage}
+          - Key: Service
+            Value: ${self:service}
+
+# プラグイン
+plugins:
+  - serverless-offline
